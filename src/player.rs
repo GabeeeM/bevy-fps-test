@@ -48,7 +48,10 @@ fn spawn_player(
 ) {
     let player = (
         PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
+            mesh: meshes.add(Mesh::from(shape::UVSphere {
+                radius: 1.0,
+                ..default()
+            })),
             material: materials.add(Color::CRIMSON.into()),
             transform: Transform::from_xyz(0.0, 0.5, 0.0),
             ..default()
@@ -58,6 +61,8 @@ fn spawn_player(
         Sensitivity(0.06),
         Speed(2.0),
         KinematicCharacterController::default(),
+        Collider::ball(0.5),
+        RigidBody::KinematicPositionBased,
     );
 
     commands.spawn(player);
@@ -70,6 +75,7 @@ fn player_input(
     mut cam_q: Query<&mut Transform, (With<Camera3d>, Without<Player>)>,
     mut q_windows: Query<&mut Window, With<PrimaryWindow>>,
     mut motion_evr: EventReader<MouseMotion>,
+    mut controllers: Query<&mut KinematicCharacterController>,
 ) {
     for (mut player_transform, mut player_paused, player_sens, mut player_speed) in
         player_q.iter_mut()
@@ -136,7 +142,9 @@ fn player_input(
 
         // direction.y = 0.0;
         let movement = direction.normalize_or_zero() * player_speed.0 * time.delta_seconds();
-        player_transform.translation += movement;
+        for mut controller in controllers.iter_mut() {
+            controller.translation = Some(movement);
+        }
         cam.translation += movement;
         player_transform.look_to(cam.forward(), Vec3::Y);
     }

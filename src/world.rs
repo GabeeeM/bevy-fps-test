@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
 
 pub struct WorldPlugin;
 
@@ -29,16 +30,19 @@ fn spawn_mirror(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let mirror = PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
-        transform: Transform::from_xyz(5.0, 2.5, 5.0),
-        material: materials.add(StandardMaterial {
-            reflectance: 1.0,
-            metallic: 1.0,
+    let mirror = (
+        PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
+            transform: Transform::from_xyz(5.0, 2.5, 5.0),
+            material: materials.add(StandardMaterial {
+                reflectance: 1.0,
+                metallic: 1.0,
+                ..default()
+            }),
             ..default()
-        }),
-        ..default()
-    };
+        },
+        RigidBody::Fixed,
+    );
 
     commands.spawn(mirror);
 }
