@@ -1,5 +1,5 @@
-use bevy::prelude::*;
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use bevy::{app::App, DefaultPlugins};
+use bevy_rapier3d::prelude::*;
 
 mod player;
 mod world;
@@ -13,7 +13,7 @@ fn main() {
             DefaultPlugins,
             PlayerPlugin,
             WorldPlugin,
-            WorldInspectorPlugin::new(),
+            RapierPhysicsPlugin::<NoUserData>::default(),
         ))
         .run();
 }
