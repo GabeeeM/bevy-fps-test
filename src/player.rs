@@ -40,6 +40,7 @@ fn spawn_camera(mut commands: Commands) {
     commands.spawn(camera);
 }
 
+//hi there
 fn spawn_player(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
