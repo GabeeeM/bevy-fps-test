@@ -5,7 +5,7 @@ pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (spawn_floor, spawn_mirror, spawn_light));
+        app.add_systems(Startup, (spawn_floor, spawn_cube, spawn_light));
     }
 }
 
@@ -14,18 +14,20 @@ fn spawn_floor(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let floor = {
+    let floor = (
         PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Plane::from_size(800.0))),
             material: materials.add(Color::INDIGO.into()),
             ..default()
-        }
-    };
+        },
+        RigidBody::Fixed,
+        Collider::cuboid(400.0, 0.1, 400.0),
+    );
 
     commands.spawn(floor);
 }
 
-fn spawn_mirror(
+fn spawn_cube(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -34,14 +36,11 @@ fn spawn_mirror(
         PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
             transform: Transform::from_xyz(5.0, 2.5, 5.0),
-            material: materials.add(StandardMaterial {
-                reflectance: 1.0,
-                metallic: 1.0,
-                ..default()
-            }),
+            material: materials.add(Color::RED.into()),
             ..default()
         },
         RigidBody::Fixed,
+        Collider::cuboid(2.5, 2.5, 2.5),
     );
 
     commands.spawn(mirror);

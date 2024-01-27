@@ -49,7 +49,7 @@ fn spawn_player(
     let player = (
         PbrBundle {
             mesh: meshes.add(Mesh::from(shape::UVSphere {
-                radius: 1.0,
+                radius: 0.5,
                 ..default()
             })),
             material: materials.add(Color::CRIMSON.into()),
@@ -60,9 +60,12 @@ fn spawn_player(
         Paused(false),
         Sensitivity(0.06),
         Speed(2.0),
-        KinematicCharacterController::default(),
-        Collider::ball(0.5),
         RigidBody::KinematicPositionBased,
+        Collider::ball(0.5),
+        KinematicCharacterController {
+            slide: true,
+            ..default()
+        },
     );
 
     commands.spawn(player);
@@ -71,13 +74,21 @@ fn spawn_player(
 fn player_input(
     keys: Res<Input<KeyCode>>,
     time: Res<Time>,
-    mut player_q: Query<(&mut Transform, &mut Paused, &mut Sensitivity, &mut Speed), With<Player>>,
+    mut player_q: Query<
+        (
+            &mut Transform,
+            &mut Paused,
+            &mut Sensitivity,
+            &mut Speed,
+            &mut KinematicCharacterController,
+        ),
+        With<Player>,
+    >,
     mut cam_q: Query<&mut Transform, (With<Camera3d>, Without<Player>)>,
     mut q_windows: Query<&mut Window, With<PrimaryWindow>>,
     mut motion_evr: EventReader<MouseMotion>,
-    mut controllers: Query<&mut KinematicCharacterController>,
 ) {
-    for (mut player_transform, mut player_paused, player_sens, mut player_speed) in
+    for (mut player_transform, mut player_paused, player_sens, mut player_speed, mut controller) in
         player_q.iter_mut()
     {
         let mut direction = Vec3::ZERO;
@@ -105,9 +116,9 @@ fn player_input(
 
         // sprinting
         if keys.pressed(KeyCode::ShiftLeft) {
-            player_speed.0 = 50.0;
+            player_speed.0 = 30.0;
         } else {
-            player_speed.0 = 2.0;
+            player_speed.0 = 5.0;
         }
 
         // "pause"
@@ -142,11 +153,9 @@ fn player_input(
 
         // direction.y = 0.0;
         let movement = direction.normalize_or_zero() * player_speed.0 * time.delta_seconds();
-        for mut controller in controllers.iter_mut() {
-            controller.translation = Some(movement);
-        }
-        cam.translation += movement;
-        player_transform.look_to(cam.forward(), Vec3::Y);
+        controller.translation = Some(movement);
+        cam.translation = player_transform.translation;
+        // player_transform.look_to(cam.forward(), Vec3::Y);
     }
 }
 
@@ -158,7 +167,7 @@ fn sens_slider(
         if paused.0 {
             egui::Window::new("Hello").show(contexts.ctx_mut(), |ui| {
                 ui.label("Sensitiviy");
-                ui.add(egui::DragValue::new(&mut player_sens.0).speed(0.1));
+                ui.add(egui::DragValue::new(&mut player_sens.0).speed(0.01));
             });
         }
     }
