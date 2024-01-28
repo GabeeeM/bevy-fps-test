@@ -1,4 +1,5 @@
 use bevy::{
+    core_pipeline::bloom::BloomSettings,
     input::mouse::MouseMotion,
     prelude::*,
     window::{CursorGrabMode, PrimaryWindow},
@@ -13,7 +14,8 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (spawn_player, spawn_camera))
             .add_plugins(EguiPlugin)
-            .add_systems(Update, (player_input, sens_slider));
+            .add_systems(Update, (player_input, sens_slider, toggle_bloom))
+            .add_event::<BloomEvent>();
     }
 }
 
@@ -30,12 +32,17 @@ struct Sensitivity(f32);
 struct Speed(f32);
 
 fn spawn_camera(mut commands: Commands) {
-    let camera = {
+    let camera = (
         Camera3dBundle {
             transform: Transform::from_xyz(0.0, 0.5, 0.0).looking_at(Vec3::X, Vec3::Y),
+            camera: Camera {
+                hdr: true,
+                ..default()
+            },
             ..default()
-        }
-    };
+        },
+        BloomSettings::NATURAL,
+    );
 
     commands.spawn(camera);
 }
@@ -76,7 +83,7 @@ fn player_input(
     time: Res<Time>,
     mut player_q: Query<
         (
-            &mut Transform,
+            &Transform,
             &mut Paused,
             &mut Sensitivity,
             &mut Speed,
@@ -88,7 +95,7 @@ fn player_input(
     mut q_windows: Query<&mut Window, With<PrimaryWindow>>,
     mut motion_evr: EventReader<MouseMotion>,
 ) {
-    for (mut player_transform, mut player_paused, player_sens, mut player_speed, mut controller) in
+    for (player_transform, mut player_paused, player_sens, mut player_speed, mut controller) in
         player_q.iter_mut()
     {
         let mut direction = Vec3::ZERO;
@@ -159,16 +166,34 @@ fn player_input(
     }
 }
 
+#[derive(Event)]
+struct BloomEvent;
+
 fn sens_slider(
     mut contexts: EguiContexts,
     mut player_q: Query<(&mut Sensitivity, &Paused), With<Player>>,
+    mut bloom_e: EventWriter<BloomEvent>,
 ) {
     for (mut player_sens, paused) in player_q.iter_mut() {
         if paused.0 {
             egui::Window::new("Hello").show(contexts.ctx_mut(), |ui| {
                 ui.label("Sensitiviy");
                 ui.add(egui::DragValue::new(&mut player_sens.0).speed(0.01));
+                if ui.add(egui::Button::new("Bloom")).clicked() {
+                    bloom_e.send(BloomEvent);
+                }
             });
+        }
+    }
+}
+
+fn toggle_bloom(
+    mut cam_q: Query<&mut Camera, (With<Camera3d>, Without<Player>)>,
+    mut events: EventReader<BloomEvent>,
+) {
+    if events.read().next().is_some() {
+        for mut cam_settings in cam_q.iter_mut() {
+            cam_settings.hdr = !cam_settings.hdr;
         }
     }
 }
