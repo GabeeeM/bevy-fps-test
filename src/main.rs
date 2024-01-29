@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use bevy::{app::App, math::Vec3, utils::default, DefaultPlugins};
 use bevy_rapier3d::prelude::*;
 
