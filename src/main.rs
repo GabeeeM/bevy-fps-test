@@ -1,4 +1,4 @@
-use bevy::{app::App, DefaultPlugins};
+use bevy::{app::App, math::Vec3, utils::default, DefaultPlugins};
 use bevy_rapier3d::prelude::*;
 
 mod player;
@@ -18,5 +18,9 @@ fn main() {
             PlayerPlugin,
             WorldPlugin,
         ))
+        .insert_resource(RapierConfiguration {
+            gravity: Vec3::from((0.0, -10.0, 0.0)),
+            ..default()
+        })
         .run();
 }

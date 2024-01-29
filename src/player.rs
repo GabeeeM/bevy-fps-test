@@ -67,12 +67,9 @@ fn spawn_player(
         Paused(false),
         Sensitivity(0.06),
         Speed(2.0),
-        RigidBody::KinematicPositionBased,
+        RigidBody::Dynamic,
         Collider::ball(0.5),
-        KinematicCharacterController {
-            slide: true,
-            ..default()
-        },
+        Velocity::default(),
     );
 
     commands.spawn(player);
@@ -87,19 +84,27 @@ fn player_input(
             &mut Paused,
             &mut Sensitivity,
             &mut Speed,
-            &mut KinematicCharacterController,
+            &mut Velocity,
         ),
         With<Player>,
     >,
+    rapier_context: Res<RapierContext>,
     mut cam_q: Query<&mut Transform, (With<Camera3d>, Without<Player>)>,
     mut q_windows: Query<&mut Window, With<PrimaryWindow>>,
     mut motion_evr: EventReader<MouseMotion>,
 ) {
-    for (player_transform, mut player_paused, player_sens, mut player_speed, mut controller) in
+    for (player_transform, mut player_paused, player_sens, mut player_speed, mut velocity) in
         player_q.iter_mut()
     {
         let mut direction = Vec3::ZERO;
         let mut cam = cam_q.get_single_mut().unwrap();
+        let hit = rapier_context.cast_ray(
+            player_transform.translation - 0.6,
+            Vec3::new(0.0, -1.0, 0.0),
+            0.2,
+            true,
+            QueryFilter::only_fixed(),
+        );
 
         // forward
         if keys.pressed(KeyCode::W) {
@@ -119,6 +124,11 @@ fn player_input(
         // right
         if keys.pressed(KeyCode::D) {
             direction += cam.right();
+        }
+
+        // jump
+        if keys.pressed(KeyCode::Space) && hit.is_some() {
+            velocity.linvel.y = 10.0;
         }
 
         // sprinting
@@ -158,9 +168,12 @@ fn player_input(
             primary_window.cursor.visible = false;
         }
 
-        // direction.y = 0.0;
         let movement = direction.normalize_or_zero() * player_speed.0 * time.delta_seconds();
-        controller.translation = Some(movement);
+        velocity.linvel.x = movement.x * 100.0;
+        velocity.linvel.z = movement.z * 100.0;
+
+        println!("{}", velocity.linvel.y);
+
         cam.translation = player_transform.translation;
         // player_transform.look_to(cam.forward(), Vec3::Y);
     }
