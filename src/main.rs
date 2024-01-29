@@ -3,8 +3,10 @@ use bevy_rapier3d::prelude::*;
 
 mod player;
 // mod sphere;
+mod crosshair;
 mod world;
 
+use crosshair::CrosshairPlugin;
 use player::PlayerPlugin;
 // use sphere::SpherePlugin;
 use world::WorldPlugin;
@@ -17,6 +19,7 @@ fn main() {
             // RapierDebugRenderPlugin::default(),
             PlayerPlugin,
             WorldPlugin,
+            CrosshairPlugin,
         ))
         .insert_resource(RapierConfiguration {
             gravity: Vec3::from((0.0, -10.0, 0.0)),

@@ -14,8 +14,9 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (spawn_player, spawn_camera))
             .add_plugins(EguiPlugin)
-            .add_systems(Update, (player_input, sens_slider, toggle_bloom))
-            .add_event::<BloomEvent>();
+            .add_systems(Update, (player_input, sens_slider, toggle_bloom, shot_tar))
+            .add_event::<BloomEvent>()
+            .add_event::<ShotTar>();
     }
 }
 
@@ -70,13 +71,18 @@ fn spawn_player(
         RigidBody::Dynamic,
         Collider::ball(0.5),
         Velocity::default(),
+        LockedAxes::ROTATION_LOCKED,
     );
 
     commands.spawn(player);
 }
 
+#[derive(Event)]
+struct ShotTar(Entity);
+
 fn player_input(
     keys: Res<Input<KeyCode>>,
+    mouse_buttons: Res<Input<MouseButton>>,
     time: Res<Time>,
     mut player_q: Query<
         (
@@ -92,6 +98,7 @@ fn player_input(
     mut cam_q: Query<&mut Transform, (With<Camera3d>, Without<Player>)>,
     mut q_windows: Query<&mut Window, With<PrimaryWindow>>,
     mut motion_evr: EventReader<MouseMotion>,
+    mut shot_tar: EventWriter<ShotTar>,
 ) {
     for (player_transform, mut player_paused, player_sens, mut player_speed, mut velocity) in
         player_q.iter_mut()
@@ -99,7 +106,7 @@ fn player_input(
         let mut direction = Vec3::ZERO;
         let mut cam = cam_q.get_single_mut().unwrap();
         let hit = rapier_context.cast_ray(
-            player_transform.translation - 0.6,
+            player_transform.translation - Vec3::new(0.0, 0.6, 0.0),
             Vec3::new(0.0, -1.0, 0.0),
             0.2,
             true,
@@ -147,6 +154,19 @@ fn player_input(
             }
         }
 
+        // shoot
+        if mouse_buttons.just_pressed(MouseButton::Left) && !player_paused.0 {
+            if let Some((entity, _distance)) = rapier_context.cast_ray(
+                player_transform.translation,
+                cam.forward(),
+                100.0,
+                true,
+                QueryFilter::only_fixed(),
+            ) {
+                shot_tar.send(ShotTar(entity));
+            }
+        }
+
         // cursor locking
         if player_paused.0 {
             let mut primary_window = q_windows.single_mut();
@@ -172,10 +192,26 @@ fn player_input(
         velocity.linvel.x = movement.x * 100.0;
         velocity.linvel.z = movement.z * 100.0;
 
-        println!("{}", velocity.linvel.y);
-
         cam.translation = player_transform.translation;
         // player_transform.look_to(cam.forward(), Vec3::Y);
+    }
+}
+
+fn shot_tar(
+    mut events: EventReader<ShotTar>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    query: Query<&Handle<StandardMaterial>>,
+) {
+    for ShotTar(entity) in events.read() {
+        if let Ok(material_handle) = query.get(*entity) {
+            if let Some(material) = materials.get_mut(material_handle) {
+                material.base_color = Color::rgb(
+                    fastrand::i32(0..10) as f32 / 10.0,
+                    fastrand::i32(0..10) as f32 / 10.0,
+                    fastrand::i32(0..10) as f32 / 10.0,
+                );
+            }
+        }
     }
 }
 
