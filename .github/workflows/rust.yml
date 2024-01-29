@@ -22,8 +22,10 @@ jobs:
     - name: Build
       run: cargo build --release
 
-    - name: Upload Executable as Artifact
+    - name: Upload Executable and Assets Folder as Artifact
       uses: actions/upload-artifact@v3
       with:
         name: Thing  # Name of the artifact
-        path: target/release/*.exe  # Use wildcard for the executable
+        path: |
+          target/release/*.exe  # Use wildcard for the executable
+          assets                # Path to the assets folder itself
