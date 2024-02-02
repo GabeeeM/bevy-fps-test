@@ -1,14 +1,7 @@
 name: Rust
 
 on:
-  push:
-    branches: [ "master" ]
-    paths:
-      - 'README.md'
-  pull_request:
-    branches: [ "master" ]
-    paths:
-      - 'README.md'
+  workflow_dispatch:  # This allows manual triggering of the workflow
 
 env:
   CARGO_TERM_COLOR: always
@@ -22,7 +15,7 @@ jobs:
     - name: Build
       run: cargo build --release
 
-    - name: Upload Executable and Assets Folder as Artifact
+    - name: Upload Executable as Artifact
       uses: actions/upload-artifact@v3
       with:
         name: Thing  # Name of the artifact
