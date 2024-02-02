@@ -6,9 +6,11 @@ use bevy_rapier3d::prelude::*;
 mod player;
 // mod sphere;
 mod crosshair;
+mod jumbotile;
 mod world;
 
 use crosshair::CrosshairPlugin;
+use jumbotile::JumboTilePlugin;
 use player::PlayerPlugin;
 // use sphere::SpherePlugin;
 use world::WorldPlugin;
@@ -22,6 +24,7 @@ fn main() {
             PlayerPlugin,
             WorldPlugin,
             CrosshairPlugin,
+            JumboTilePlugin,
         ))
         .insert_resource(RapierConfiguration {
             gravity: Vec3::from((0.0, -10.0, 0.0)),

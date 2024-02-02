@@ -1,10 +1,12 @@
 use bevy::{
+    audio::{Volume, VolumeLevel},
     core_pipeline::bloom::BloomSettings,
     input::mouse::MouseMotion,
     prelude::*,
     window::{CursorGrabMode, PrimaryWindow},
 };
 
+use crate::jumbotile::Kovaak;
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use bevy_rapier3d::prelude::*;
 
@@ -163,6 +165,7 @@ fn player_input(
                 true,
                 QueryFilter::only_fixed(),
             ) {
+                println!("{:?}", entity);
                 shot_tar.send(ShotTar(entity));
             }
         }
@@ -199,19 +202,37 @@ fn player_input(
 
 fn shot_tar(
     mut events: EventReader<ShotTar>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    query: Query<&Handle<StandardMaterial>>,
+    mut query: Query<&mut Transform, With<Kovaak>>,
+    asset_server: Res<AssetServer>,
+    mut commands: Commands,
 ) {
     for ShotTar(entity) in events.read() {
-        if let Ok(material_handle) = query.get(*entity) {
-            if let Some(material) = materials.get_mut(material_handle) {
-                material.base_color = Color::rgb(
-                    fastrand::i32(0..10) as f32 / 10.0,
-                    fastrand::i32(0..10) as f32 / 10.0,
-                    fastrand::i32(0..10) as f32 / 10.0,
-                );
-            }
+        if let Ok(mut shot_thing) = query.get_mut(*entity) {
+            shot_thing.translation = Vec3::new(
+                -15.0,
+                fastrand::i32(100..900) as f32 / 100.0,
+                fastrand::i32(100..900) as f32 / 100.0,
+            );
+            commands.spawn(AudioBundle {
+                source: asset_server.load("Hitsound.ogg"),
+                settings: PlaybackSettings {
+                    volume: Volume::Relative(VolumeLevel::new(0.1)),
+                    ..default()
+                },
+            });
         }
+
+        // if let Ok(shot_thing) = query.get(*entity) {}
+
+        // if let Ok(material_handle) = query.get(*entity) {
+        //     if let Some(material) = materials.get_mut(material_handle) {
+        //         material.base_color = Color::rgb(
+        //             fastrand::i32(0..10) as f32 / 10.0,
+        //             fastrand::i32(0..10) as f32 / 10.0,
+        //             fastrand::i32(0..10) as f32 / 10.0,
+        //         );
+        //     }
+        // }
     }
 }
 
