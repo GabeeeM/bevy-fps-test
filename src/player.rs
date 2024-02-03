@@ -36,6 +36,10 @@ struct Speed(f32);
 
 fn spawn_camera(mut commands: Commands) {
     let camera = (
+        PerspectiveProjection {
+            fov: 1.79769,
+            ..default()
+        },
         Camera3dBundle {
             transform: Transform::from_xyz(0.0, 0.5, 0.0).looking_at(Vec3::X, Vec3::Y),
             camera: Camera {
@@ -242,17 +246,22 @@ struct BloomEvent;
 fn sens_slider(
     mut contexts: EguiContexts,
     mut player_q: Query<(&mut Sensitivity, &Paused), With<Player>>,
+    mut camera_q: Query<&mut PerspectiveProjection>,
     mut bloom_e: EventWriter<BloomEvent>,
 ) {
     for (mut player_sens, paused) in player_q.iter_mut() {
-        if paused.0 {
-            egui::Window::new("Hello").show(contexts.ctx_mut(), |ui| {
-                ui.label("Sensitiviy");
-                ui.add(egui::DragValue::new(&mut player_sens.0).speed(0.01));
-                if ui.add(egui::Button::new("Bloom")).clicked() {
-                    bloom_e.send(BloomEvent);
-                }
-            });
+        for mut camera in camera_q.iter_mut() {
+            if paused.0 {
+                egui::Window::new("Hello").show(contexts.ctx_mut(), |ui| {
+                    ui.label("Sensitiviy");
+                    ui.add(egui::DragValue::new(&mut player_sens.0).speed(0.01));
+                    if ui.add(egui::Button::new("Bloom")).clicked() {
+                        bloom_e.send(BloomEvent);
+                    }
+                    ui.label("Fov");
+                    ui.add(egui::DragValue::new(&mut camera.fov).speed(0.05));
+                });
+            }
         }
     }
 }
