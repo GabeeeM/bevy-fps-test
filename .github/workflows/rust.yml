@@ -1,7 +1,12 @@
 name: Rust
 
 on:
-  workflow_dispatch:  # This allows manual triggering of the workflow
+  workflow_dispatch:
+    inputs:
+      title:
+        description: 'Title for the run'
+        required: true
+        default: 'Default Title'
 
 env:
   CARGO_TERM_COLOR: always
@@ -18,5 +23,5 @@ jobs:
     - name: Upload Executable as Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: Thing  # Name of the artifact
-        path: target/release/*.exe  # Use wildcard for the executable
+        name: ${{ github.event.inputs.title }}
+        path: target/release/*.exe
