@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::{
     audio::{Volume, VolumeLevel},
     core_pipeline::bloom::BloomSettings,
@@ -16,9 +18,20 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (spawn_player, spawn_camera))
             .add_plugins(EguiPlugin)
-            .add_systems(Update, (player_input, sens_slider, toggle_bloom, shot_tar))
+            .add_systems(
+                Update,
+                (
+                    player_input,
+                    sens_slider,
+                    toggle_bloom,
+                    shot_tar,
+                    rocket_jump,
+                    despawn_blast,
+                ),
+            )
             .add_event::<BloomEvent>()
-            .add_event::<ShotTar>();
+            .add_event::<ShotTar>()
+            .add_event::<RocketJump>();
     }
 }
 
@@ -78,6 +91,11 @@ fn spawn_player(
         Collider::ball(0.5),
         Velocity::default(),
         LockedAxes::ROTATION_LOCKED,
+        Ccd::enabled(),
+        Friction {
+            coefficient: 0.0,
+            combine_rule: CoefficientCombineRule::Min,
+        },
     );
 
     commands.spawn(player);
@@ -85,6 +103,9 @@ fn spawn_player(
 
 #[derive(Event)]
 struct ShotTar(Entity);
+
+#[derive(Event)]
+struct RocketJump(Vec3);
 
 fn player_input(
     keys: Res<Input<KeyCode>>,
@@ -105,6 +126,7 @@ fn player_input(
     mut q_windows: Query<&mut Window, With<PrimaryWindow>>,
     mut motion_evr: EventReader<MouseMotion>,
     mut shot_tar: EventWriter<ShotTar>,
+    mut rocket_jump: EventWriter<RocketJump>,
 ) {
     for (player_transform, mut player_paused, player_sens, mut player_speed, mut velocity) in
         player_q.iter_mut()
@@ -169,8 +191,21 @@ fn player_input(
                 true,
                 QueryFilter::only_fixed(),
             ) {
-                println!("{:?}", entity);
                 shot_tar.send(ShotTar(entity));
+            }
+        }
+
+        // rocket jump thing
+        if mouse_buttons.just_pressed(MouseButton::Right) && !player_paused.0 {
+            if let Some((_entity, distance)) = rapier_context.cast_ray_and_get_normal(
+                player_transform.translation,
+                cam.forward(),
+                5.0,
+                true,
+                QueryFilter::only_fixed(),
+            ) {
+                let hit_point = distance.point;
+                rocket_jump.send(RocketJump(hit_point));
             }
         }
 
@@ -237,6 +272,66 @@ fn shot_tar(
         //         );
         //     }
         // }
+    }
+}
+
+#[derive(Component)]
+struct BlastDuration {
+    timer: Timer,
+}
+
+fn rocket_jump(
+    mut events: EventReader<RocketJump>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    for RocketJump(position) in events.read() {
+        let explosion = (
+            PbrBundle {
+                mesh: meshes.add(Mesh::from(shape::UVSphere {
+                    radius: 0.5,
+                    ..default()
+                })),
+                material: materials.add(Color::CRIMSON.into()),
+                transform: Transform::from_xyz(position.x, position.y, position.z),
+                ..default()
+            },
+            Collider::ball(1.5),
+            BlastDuration {
+                timer: Timer::new(Duration::from_secs(1), TimerMode::Once),
+            },
+            Sensor,
+        );
+
+        commands.spawn(explosion);
+    }
+}
+
+fn blast_player(
+    mut player_q: Query<(&Transform, &mut Velocity), With<Player>>,
+    blast_q: Query<&Transform, With<BlastDuration>>,
+) {
+    for (player_transform, mut player_velocity) in player_q.iter_mut() {
+        for blast_transform in blast_q.iter() {
+            let direction = player_transform.translation - blast_transform.translation;
+        }
+    }
+}
+
+fn despawn_blast(
+    mut commands: Commands,
+    mut q: Query<(Entity, &mut BlastDuration)>,
+    time: Res<Time>,
+) {
+    for (entity, mut fuse_timer) in q.iter_mut() {
+        // timers gotta be ticked, to work
+        fuse_timer.timer.tick(time.delta());
+
+        // if it finished, despawn the bomb
+        if fuse_timer.timer.finished() {
+            commands.entity(entity).despawn();
+        }
     }
 }
 
