@@ -10,13 +10,13 @@ use bevy::{
 
 use crate::jumbotile::Kovaak;
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
-use bevy_rapier3d::prelude::*;
+use bevy_rapier3d::{prelude::*, rapier::dynamics::RigidBodyBuilder};
 
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (spawn_player, spawn_camera))
+        app.add_systems(Startup, (spawn_player, spawn_camera, spawn_player_light))
             .add_plugins(EguiPlugin)
             .add_systems(
                 Update,
@@ -27,6 +27,7 @@ impl Plugin for PlayerPlugin {
                     shot_tar,
                     rocket_jump,
                     despawn_blast,
+                    blast_player,
                 ),
             )
             .add_event::<BloomEvent>()
@@ -67,6 +68,23 @@ fn spawn_camera(mut commands: Commands) {
     commands.spawn(camera);
 }
 
+fn spawn_player_light(mut commands: Commands) {
+    let light = (
+        PointLightBundle {
+            transform: Transform::from_xyz(0.0, 3.0, 0.0),
+            point_light: PointLight {
+                intensity: 2500.0,
+                shadows_enabled: true,
+                ..default()
+            },
+            ..default()
+        },
+        Player,
+    );
+
+    commands.spawn(light);
+}
+
 //hi there
 fn spawn_player(
     mut commands: Commands,
@@ -93,9 +111,13 @@ fn spawn_player(
         LockedAxes::ROTATION_LOCKED,
         Ccd::enabled(),
         Friction {
-            coefficient: 0.0,
+            coefficient: 10.0,
             combine_rule: CoefficientCombineRule::Min,
         },
+        // Damping {
+        //     linear_damping: 10.0,
+        //     ..default()
+        // },
     );
 
     commands.spawn(player);
@@ -123,6 +145,7 @@ fn player_input(
     >,
     rapier_context: Res<RapierContext>,
     mut cam_q: Query<&mut Transform, (With<Camera3d>, Without<Player>)>,
+    // mut light_q: Query<&mut Transform, (With<PointLight>, <Player>)>,
     mut q_windows: Query<&mut Window, With<PrimaryWindow>>,
     mut motion_evr: EventReader<MouseMotion>,
     mut shot_tar: EventWriter<ShotTar>,
@@ -133,6 +156,7 @@ fn player_input(
     {
         let mut direction = Vec3::ZERO;
         let mut cam = cam_q.get_single_mut().unwrap();
+        // let mut light = light_q.get_single_mut().unwrap();
         let hit = rapier_context.cast_ray(
             player_transform.translation - Vec3::new(0.0, 0.6, 0.0),
             Vec3::new(0.0, -1.0, 0.0),
@@ -231,10 +255,12 @@ fn player_input(
         }
 
         let movement = direction.normalize_or_zero() * player_speed.0 * time.delta_seconds();
-        velocity.linvel.x = movement.x * 100.0;
-        velocity.linvel.z = movement.z * 100.0;
+        // velocity.linvel.x += movement.x * 500.0;
+        // velocity.linvel.z += movement.z * 500.0;
 
         cam.translation = player_transform.translation;
+        // light.translation = player_transform.translation + Vec3::new(0.0, 2.0, 0.0);
+
         // player_transform.look_to(cam.forward(), Vec3::Y);
     }
 }
@@ -309,12 +335,19 @@ fn rocket_jump(
 }
 
 fn blast_player(
-    mut player_q: Query<(&Transform, &mut Velocity), With<Player>>,
-    blast_q: Query<&Transform, With<BlastDuration>>,
+    mut player_q: Query<(&Transform, &mut Velocity, Entity), With<Player>>,
+    blast_q: Query<(&Transform, Entity), With<BlastDuration>>,
+    rapier_context: Res<RapierContext>,
+    time: Res<Time>,
 ) {
-    for (player_transform, mut player_velocity) in player_q.iter_mut() {
-        for blast_transform in blast_q.iter() {
-            let direction = player_transform.translation - blast_transform.translation;
+    //could do let (player_transform, mut player_velocity) = player_q.get_single_mut().unwrap()
+    for (player_transform, mut player_velocity, player_entity) in player_q.iter_mut() {
+        for (blast_transform, blast_entity) in blast_q.iter() {
+            if rapier_context.intersection_pair(player_entity, blast_entity) == Some(true) {
+                let direction = player_transform.translation - blast_transform.translation;
+                println!("{}", direction);
+                player_velocity.linvel += direction * time.delta_seconds() * 50.0;
+            }
         }
     }
 }
