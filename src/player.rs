@@ -10,13 +10,13 @@ use bevy::{
 
 use crate::jumbotile::Kovaak;
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
-use bevy_rapier3d::{prelude::*, rapier::dynamics::RigidBodyBuilder};
+use bevy_rapier3d::prelude::*;
 
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (spawn_player, spawn_camera))
+        app.add_systems(Startup, spawn_player)
             .add_plugins(EguiPlugin)
             .add_systems(
                 Update,
@@ -47,26 +47,6 @@ struct Sensitivity(f32);
 
 #[derive(Component)]
 struct Speed(f32);
-
-fn spawn_camera(mut commands: Commands) {
-    let camera = (
-        PerspectiveProjection {
-            fov: 0.7,
-            ..default()
-        },
-        Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 0.5, 0.0).looking_at(Vec3::X, Vec3::Y),
-            camera: Camera {
-                hdr: true,
-                ..default()
-            },
-            ..default()
-        },
-        BloomSettings::NATURAL,
-    );
-
-    commands.spawn(camera);
-}
 
 //hi there
 fn spawn_player(
@@ -106,17 +86,34 @@ fn spawn_player(
     let light = (PointLightBundle {
         transform: Transform::from_xyz(0.0, 3.0, 0.0),
         point_light: PointLight {
-            intensity: 2500.0,
+            intensity: 500.0,
             shadows_enabled: true,
             ..default()
         },
         ..default()
     },);
 
+    let camera = (
+        PerspectiveProjection {
+            fov: 0.7,
+            ..default()
+        },
+        Camera3dBundle {
+            transform: Transform::from_xyz(0.0, 0.5, 0.0).looking_at(Vec3::X, Vec3::Y),
+            camera: Camera {
+                hdr: true,
+                ..default()
+            },
+            ..default()
+        },
+        BloomSettings::NATURAL,
+    );
+
     commands
         .spawn(player)
         .with_children(|parent: &mut ChildBuilder<'_, '_, '_>| {
             parent.spawn(light);
+            parent.spawn(camera);
         });
 }
 
@@ -162,22 +159,26 @@ fn player_input(
 
         // forward
         if keys.pressed(KeyCode::W) {
-            direction += cam.forward();
+            direction.x += cam.forward().x;
+            direction.z += cam.forward().z;
         }
 
         // back
         if keys.pressed(KeyCode::S) {
-            direction += cam.back();
+            direction.x += cam.back().x;
+            direction.z += cam.back().z;
         }
 
         // left
         if keys.pressed(KeyCode::A) {
-            direction += cam.left();
+            direction.x += cam.left().x;
+            direction.z += cam.left().z;
         }
 
         // right
         if keys.pressed(KeyCode::D) {
-            direction += cam.right();
+            direction.x += cam.right().x;
+            direction.z += cam.right().z;
         }
 
         // jump
@@ -253,7 +254,7 @@ fn player_input(
         velocity.linvel.x += movement.x * 2.0;
         velocity.linvel.z += movement.z * 2.0;
 
-        cam.translation = player_transform.translation;
+        // cam.translation = player_transform.translation;
 
         // player_transform.look_to(cam.forward(), Vec3::Y);
     }
