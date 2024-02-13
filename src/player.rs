@@ -74,13 +74,14 @@ fn spawn_player(
         LockedAxes::ROTATION_LOCKED,
         Ccd::enabled(),
         Friction {
-            coefficient: 10.0,
+            coefficient: 20.0,
             combine_rule: CoefficientCombineRule::Min,
         },
-        // Damping {
-        //     linear_damping: 10.0,
-        //     ..default()
-        // },
+        ExternalImpulse::default(),
+        Damping {
+            linear_damping: 0.2,
+            ..default()
+        },
     );
 
     let light = (PointLightBundle {
@@ -112,7 +113,7 @@ fn spawn_player(
     commands
         .spawn(player)
         .with_children(|parent: &mut ChildBuilder<'_, '_, '_>| {
-            parent.spawn(light);
+            // parent.spawn(light);
             parent.spawn(camera);
         });
 }
@@ -205,7 +206,12 @@ fn player_input(
         // shoot
         if mouse_buttons.just_pressed(MouseButton::Left) && !player_paused.0 {
             if let Some((entity, _distance)) = rapier_context.cast_ray(
-                player_transform.translation,
+                player_transform.translation
+                    + Vec3 {
+                        x: 0.0,
+                        y: 0.5,
+                        z: 0.0,
+                    },
                 cam.forward(),
                 100.0,
                 true,
@@ -218,7 +224,12 @@ fn player_input(
         // rocket jump thing
         if mouse_buttons.just_pressed(MouseButton::Right) && !player_paused.0 {
             if let Some((_entity, distance)) = rapier_context.cast_ray_and_get_normal(
-                player_transform.translation,
+                player_transform.translation
+                    + Vec3 {
+                        x: 0.0,
+                        y: 0.5,
+                        z: 0.0,
+                    },
                 cam.forward(),
                 5.0,
                 true,
@@ -253,6 +264,9 @@ fn player_input(
         let movement = direction.normalize_or_zero() * player_speed.0 * time.delta_seconds();
         velocity.linvel.x += movement.x * 2.0;
         velocity.linvel.z += movement.z * 2.0;
+
+        // impulse.impulse.x = movement.x * 2.0;
+        // impulse.impulse.z = movement.z * 2.0;
 
         // cam.translation = player_transform.translation;
 
