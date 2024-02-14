@@ -28,11 +28,13 @@ impl Plugin for PlayerPlugin {
                     rocket_jump,
                     despawn_blast,
                     blast_player,
+                    bullet_trail,
                 ),
             )
             .add_event::<BloomEvent>()
             .add_event::<ShotTar>()
-            .add_event::<RocketJump>();
+            .add_event::<RocketJump>()
+            .add_event::<BulletTrail>();
     }
 }
 
@@ -47,6 +49,22 @@ struct Sensitivity(f32);
 
 #[derive(Component)]
 struct Speed(f32);
+
+#[derive(Component)]
+struct RocketCooldown {
+    timer: Timer,
+}
+
+#[derive(Component)]
+struct ShootCooldown {
+    timer: Timer,
+}
+
+#[derive(Event)]
+struct BulletTrail {
+    start_pos: Vec3,
+    direction: Vec3,
+}
 
 //hi there
 fn spawn_player(
@@ -82,9 +100,15 @@ fn spawn_player(
             linear_damping: 0.2,
             ..default()
         },
+        RocketCooldown {
+            timer: Timer::new(Duration::from_millis(550), TimerMode::Once),
+        },
+        ShootCooldown {
+            timer: Timer::new(Duration::from_millis(250), TimerMode::Once),
+        },
     );
 
-    let light = (PointLightBundle {
+    let _light = (PointLightBundle {
         transform: Transform::from_xyz(0.0, 3.0, 0.0),
         point_light: PointLight {
             intensity: 500.0,
@@ -135,6 +159,8 @@ fn player_input(
             &mut Sensitivity,
             &mut Speed,
             &mut Velocity,
+            &mut RocketCooldown,
+            &mut ShootCooldown,
         ),
         With<Player>,
     >,
@@ -144,9 +170,19 @@ fn player_input(
     mut motion_evr: EventReader<MouseMotion>,
     mut shot_tar: EventWriter<ShotTar>,
     mut rocket_jump: EventWriter<RocketJump>,
+    mut bullet_trail: EventWriter<BulletTrail>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
-    for (player_transform, mut player_paused, player_sens, mut player_speed, mut velocity) in
-        player_q.iter_mut()
+    for (
+        player_transform,
+        mut player_paused,
+        player_sens,
+        mut player_speed,
+        mut velocity,
+        mut rocket_cooldown,
+        mut shoot_cooldown,
+    ) in player_q.iter_mut()
     {
         let mut direction = Vec3::ZERO;
         let mut cam = cam_q.get_single_mut().unwrap();
@@ -184,7 +220,7 @@ fn player_input(
 
         // jump
         if keys.pressed(KeyCode::Space) && hit.is_some() {
-            velocity.linvel.y = 10.0;
+            velocity.linvel.y = 5.0;
         }
 
         // sprinting
@@ -196,15 +232,16 @@ fn player_input(
 
         // "pause"
         if keys.just_pressed(KeyCode::Escape) {
-            if player_paused.0 {
-                player_paused.0 = false;
-            } else {
-                player_paused.0 = true;
-            }
+            player_paused.0 = !player_paused.0;
         }
 
         // shoot
-        if mouse_buttons.just_pressed(MouseButton::Left) && !player_paused.0 {
+        shoot_cooldown.timer.tick(time.delta());
+
+        if mouse_buttons.pressed(MouseButton::Left)
+            && !player_paused.0
+            && shoot_cooldown.timer.finished()
+        {
             if let Some((entity, _distance)) = rapier_context.cast_ray(
                 player_transform.translation
                     + Vec3 {
@@ -213,16 +250,37 @@ fn player_input(
                         z: 0.0,
                     },
                 cam.forward(),
-                100.0,
+                500.0,
                 true,
                 QueryFilter::only_fixed(),
             ) {
                 shot_tar.send(ShotTar(entity));
+                bullet_trail.send(BulletTrail {
+                    direction: cam.forward(),
+                    start_pos: player_transform.translation
+                        + Vec3 {
+                            x: 0.0,
+                            y: 0.5,
+                            z: 0.0,
+                        },
+                });
             }
+            shoot_cooldown.timer.reset();
+            commands.spawn(AudioBundle {
+                source: asset_server.load("gunshot.ogg"),
+                settings: PlaybackSettings {
+                    volume: Volume::Relative(VolumeLevel::new(0.05)),
+                    ..default()
+                },
+            });
         }
 
         // rocket jump thing
-        if mouse_buttons.just_pressed(MouseButton::Right) && !player_paused.0 {
+        rocket_cooldown.timer.tick(time.delta());
+        if mouse_buttons.pressed(MouseButton::Right)
+            && !player_paused.0
+            && rocket_cooldown.timer.finished()
+        {
             if let Some((_entity, distance)) = rapier_context.cast_ray_and_get_normal(
                 player_transform.translation
                     + Vec3 {
@@ -238,6 +296,7 @@ fn player_input(
                 let hit_point = distance.point;
                 rocket_jump.send(RocketJump(hit_point));
             }
+            rocket_cooldown.timer.reset();
         }
 
         // cursor locking
@@ -271,6 +330,42 @@ fn player_input(
         // cam.translation = player_transform.translation;
 
         // player_transform.look_to(cam.forward(), Vec3::Y);
+    }
+}
+
+fn bullet_trail(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut events: EventReader<BulletTrail>,
+) {
+    for BulletTrail {
+        start_pos,
+        direction,
+    } in events.read()
+    {
+        let trail = PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Cylinder {
+                radius: 0.2,
+                height: 5.0,
+                ..default()
+            })),
+            material: materials.add(Color::ORANGE.into()),
+            transform: Transform::looking_to(
+                Transform::from_translation(*start_pos),
+                *direction
+                    * Vec3 {
+                        x: 1.0,
+                        y: 5.0,
+                        z: 1.0,
+                    },
+                Vec3::Y,
+            ),
+
+            ..default()
+        };
+        //commented this out so it doesnt pop up fix this now!!!!                       <---- VERY IMPORTANT
+        // commands.spawn(trail);
     }
 }
 
